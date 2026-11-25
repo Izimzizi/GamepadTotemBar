@@ -63,7 +63,16 @@ local function HideTip() if GameTooltip then GameTooltip:Hide() end end
 -- spellId 0 is the "empty slot" choice
 local function Tip(owner, spellId)
     if not spellId or not GameTooltip then return end
-    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    -- next to the selected item, where the game puts its own tooltips, or none (HUD Edit Mode setting)
+    local mode = ns.TooltipMode and ns.TooltipMode() or "item"
+    if mode == "off" then GameTooltip:Hide() return end
+    if mode == "default" and _G.GameTooltip_SetDefaultAnchor then
+        if not pcall(_G.GameTooltip_SetDefaultAnchor, GameTooltip, UIParent) then
+            GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+        end
+    else
+        GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    end
     if spellId == 0 then
         GameTooltip:SetText("Empty slot")
         GameTooltip:AddLine("No totem is placed in this slot.", 1, 1, 1, true)

@@ -2,14 +2,20 @@
 
 A World of Warcraft addon for **Shamans** that brings back a visible totem bar when you play with the **gamepad UI**, and lets you change totems with the controller.
 
-![Totem flyout picker](docs/screenshot.png)
+The selected slot gets the original up arrow and a border in its element's color:
+
+![Selected totem slot with the flyout arrow and tooltip](docs/bar.png)
+
+Opening it shows the flyout picker, drawn in the original totem bar's style:
+
+![Totem flyout picker](docs/flyout.png)
 
 ## What it does
 
 - Keeps Blizzard's own totem bar (Call button, four totem slots, Recall) visible when the gamepad UI or Edit Mode would otherwise hide it.
 - Adds a **gamepad focus mode** for the bar. Move along it with the D-pad, open a flyout on any slot, and pick a totem, all without a mouse.
 - The flyout is drawn in the original totem bar's style: connected background, up and down arrows, and a per-element color and border for each slot.
-- Adds a **Scale** row to the totem bar's HUD Edit Mode settings. Position the bar with WoW's built-in HUD Edit Mode.
+- Adds a **Scale** row and a **Tooltip** row to the totem bar's HUD Edit Mode settings. Position the bar with WoW's built-in HUD Edit Mode.
 
 ## Install
 
@@ -34,6 +40,15 @@ Hold **Back / View** for half a second, or type `/gtb focus`, to enter focus mod
 Only the D-pad, A and B are taken while focused. Everything else, and the keyboard, passes through to the game. The picker opens on your current totem, and the bottom choice leaves the slot empty. The Call button's picker switches between Call of the Elements, Ancestors and Spirits.
 
 Focus mode is **out of combat only**: the game doesn't let addons change totems in combat.
+
+## Settings
+
+Both are in WoW's HUD Edit Mode: click the totem bar and look at the end of its settings dialog.
+
+| Setting | Options |
+| --- | --- |
+| Scale | 50% to 200% of the bar's size |
+| Tooltip | **Totem**: the spell tooltip is shown next to the selected totem (default). **Default**: it is shown where the game puts its own tooltips. **Off**: no tooltip in focus mode. |
 
 ## Commands
 

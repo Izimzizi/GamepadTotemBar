@@ -3,7 +3,7 @@
 ## Notes: Restores a visible shaman totem bar when using the gamepad UI.
 ## Author: Izimzizi
 ## IconTexture: Interface\AddOns\GamepadTotemBar\logo
-## Version: 1.0.1
+## Version: 1.0.2
 ## SavedVariables: GamepadTotemBarDB
 
 Report.lua

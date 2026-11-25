@@ -14,6 +14,20 @@ local MIN_SCALE, MAX_SCALE = 0.5, 2.0
 local DB, settingScale
 local Safe = ns.Safe
 
+-- Where the focus-mode spell tooltip goes: "item" = next to the selected totem, "default" = the game's own
+-- tooltip position, "off" = no tooltip
+local TIP_MODES = { "item", "default", "off" }
+local TIP_LABEL = { item = "Totem", default = "Default", off = "Off" }
+local TIP_HELP = {
+    item = "Next to the selected totem: the spell tooltip is shown beside the totem you have selected with the gamepad.",
+    default = "Default tooltip position: the spell tooltip is shown where the game puts its own tooltips.",
+    off = "Off: no spell tooltip is shown in focus mode.",
+}
+function ns.TooltipMode()
+    local m = DB and DB.tooltipMode
+    return TIP_LABEL[m] and m or "item"
+end
+
 local function BlizzFrame() return _G.MultiCastActionBarFrame or _G.TotemFrame end
 
 ---------------------------------------------------------------- spell helpers (also used by Focus.lua)
@@ -199,6 +213,60 @@ local function BuildRow(dlg)
     return row
 end
 
+-- Second row: where the focus-mode tooltip appears
+local tipRow
+local function BuildTipRow(dlg)
+    if tipRow then return tipRow end
+    tipRow = CreateFrame("Frame", nil, dlg.Settings or dlg)
+    tipRow:SetSize(310, 32)
+    tipRow.layoutIndex = 1001
+    tipRow.leftPadding = 0
+    tipRow:Hide()
+
+    local name = tipRow:CreateFontString(nil, "ARTWORK", "GameFontHighlightMedium")
+    name:SetPoint("LEFT", 0, 0)
+    name:SetWidth(95)
+    name:SetJustifyH("LEFT")
+    name:SetText("Tooltip")
+
+    -- three side-by-side buttons, the active one lit
+    local buttons = {}
+    local function Refresh()
+        local cur = ns.TooltipMode()
+        for m, b in pairs(buttons) do
+            local fs = b:GetFontString()
+            if m == cur then
+                b:LockHighlight()
+                if fs then fs:SetTextColor(1, 0.82, 0) end
+            else
+                b:UnlockHighlight()
+                if fs then fs:SetTextColor(1, 1, 1) end
+            end
+        end
+    end
+    for i, m in ipairs(TIP_MODES) do
+        local b = CreateFrame("Button", nil, tipRow, "UIPanelButtonTemplate")
+        b:SetSize(68, 24)
+        b:SetPoint("LEFT", 105 + (i - 1) * 68, 0)
+        b:SetText(TIP_LABEL[m])
+        b:SetScript("OnClick", function()
+            if DB then DB.tooltipMode = m end
+            Refresh()
+        end)
+        b:SetScript("OnEnter", function(self)
+            if not GameTooltip then return end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Spell tooltip in focus mode")
+            GameTooltip:AddLine(TIP_HELP[m], 1, 1, 1, true)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+        buttons[m] = b
+    end
+    tipRow.refresh = Refresh
+    return tipRow
+end
+
 -- The dialog is sized for a system with no settings, so our row would overlap its buttons.
 -- Grow the dialog by the row's height and move the button area down by the same amount,
 -- and undo that again when the dialog is attached to something else.
@@ -231,7 +299,7 @@ end
 
 local function Fit(dlg)
     Unfit(dlg)
-    local delta = (row and row:GetHeight() or 32) + ROW_PAD
+    local delta = (row and row:GetHeight() or 32) + (tipRow and tipRow:GetHeight() or 32) + ROW_PAD
     local btns = ButtonsFrame(dlg)
     local st = { origH = dlg:GetHeight(), buttons = btns }
     if btns then st.pts = CopyPoints(btns) end
@@ -254,6 +322,9 @@ local function UpdateRow(dlg, system)
         local r = BuildRow(dlg)
         r.set(DB.scale)
         r:Show()
+        local t = BuildTipRow(dlg)
+        t.refresh()
+        t:Show()
         if dlg.Settings and dlg.Settings.Layout then
             Relayout(dlg)
             -- Blizzard may rebuild its settings after this hook runs, so lay out again shortly
@@ -265,9 +336,13 @@ local function UpdateRow(dlg, system)
             r:SetParent(dlg)
             r:ClearAllPoints()
             r:SetPoint("TOP", dlg, "BOTTOM", 0, -6)
+            t:SetParent(dlg)
+            t:ClearAllPoints()
+            t:SetPoint("TOP", r, "BOTTOM", 0, -2)
         end
     else
         Unfit(dlg)
+        if tipRow then tipRow:Hide() end
         if row then
             row:Hide()
             if dlg.Settings and dlg.Settings.Layout then
@@ -289,7 +364,7 @@ local function HookEditMode()
         end)
     end
     dlg:HookScript("OnShow", function(self) Safe("UpdateRow(show)", UpdateRow, self) end)
-    dlg:HookScript("OnHide", function(self) if row then row:Hide() end; Unfit(self) end)
+    dlg:HookScript("OnHide", function(self) if row then row:Hide() end; if tipRow then tipRow:Hide() end; Unfit(self) end)
     if EditModeManagerFrame then
         EditModeManagerFrame:HookScript("OnShow", Restore)
         EditModeManagerFrame:HookScript("OnHide", function() C_Timer.After(0.5, Restore) end)
@@ -320,6 +395,7 @@ f:SetScript("OnEvent", function(_, event, arg1)
             DB.off, DB.refreshOn, DB.pagestateOn, DB.callPickOff, DB.callBlizzOn, DB.callBlizzOff =
                 nil, nil, nil, nil, nil, nil
             DB.scale = DB.scale or 1
+            if not TIP_LABEL[DB.tooltipMode] then DB.tooltipMode = "item" end
         end
         Safe("HookEditMode", HookEditMode)   -- Edit Mode may load on demand
         return
