@@ -91,7 +91,7 @@ local function Highlight(btn)
         hl = CreateFrame("Frame", nil, UIParent)
         hl:SetFrameStrata("TOOLTIP")
         hl.t = hl:CreateTexture(nil, "OVERLAY")
-        hl.t:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+        hl.t:SetTexture("Interface/Buttons/UI-ActionButton-Border")
         hl.t:SetBlendMode("ADD")
         hl.t:SetVertexColor(0.2, 1, 0.4)
         hl.t:SetAllPoints()
@@ -107,12 +107,98 @@ local function Highlight(btn)
     hl:Show()
 end
 
+-- The original bar's own art: one texture sheet (Interface/Buttons/UI-TotemBar), pieces by coordinates
+-- (left, right, top, bottom), read from the game's frames with /gtb dump.
+local SHEET = 310727
+-- Each totem type has its own colored set (left, right, top, bottom). Slot 1-4 = the four totem slots, in the
+-- bar's own order (earth, fire, water, air), "call" = the Call button (and Recall's border). Borders are 34x34.
+local ART = {
+    call = {
+        open  = { 0.7734, 0.9922, 0.3281, 0.3984 }, close  = { 0.7734, 0.9922, 0.2539, 0.3242 },
+        top   = { 0.2578, 0.5078, 0.0039, 0.0898 }, middle = { 0.2578, 0.5078, 0.0898, 0.1680 },
+        border = { 0.0078, 0.2734, 0.5352, 0.6680 },   -- also the Recall button's border
+    },
+    [1] = {
+        open  = { 0.7734, 0.9922, 0.6250, 0.6953 }, close  = { 0.7734, 0.9922, 0.5508, 0.6211 },
+        top   = { 0.0, 0.25, 0.1797, 0.2656 },      middle = { 0.0, 0.25, 0.2656, 0.3438 },
+        empty = { 0.5156, 0.7500, 0.0117, 0.1289 },
+        border = { 0.0078, 0.2734, 0.6719, 0.8047 },
+    },
+    [2] = {
+        open  = { 0.7734, 0.9922, 0.4766, 0.5469 }, close  = { 0.7734, 0.9922, 0.4023, 0.4727 },
+        top   = { 0.2578, 0.5078, 0.1797, 0.2656 }, middle = { 0.2578, 0.5078, 0.2656, 0.3438 },
+        empty = { 0.5234, 0.7578, 0.3906, 0.5078 },
+        border = { 0.2812, 0.5469, 0.6719, 0.8047 },
+    },
+    [3] = {
+        open  = { 0.7734, 0.9922, 0.7773, 0.8477 }, close  = { 0.7734, 0.9922, 0.7031, 0.7734 },
+        top   = { 0.0, 0.25, 0.0039, 0.0898 },      middle = { 0.0, 0.25, 0.0898, 0.1680 },
+        empty = { 0.3047, 0.5391, 0.8164, 0.9336 },
+        border = { 0.0078, 0.2734, 0.8086, 0.9375 },
+    },
+    [4] = {
+        open  = { 0.7734, 0.9922, 0.9258, 0.9961 }, close  = { 0.7734, 0.9922, 0.8516, 0.9219 },
+        top   = { 0.0, 0.25, 0.3555, 0.4414 },      middle = { 0.0, 0.25, 0.4414, 0.5195 },
+        empty = { 0.5156, 0.7500, 0.1406, 0.2578 },
+        border = { 0.2812, 0.5469, 0.5352, 0.6680 },
+    },
+}
+
+-- which set belongs to a bar item
+local function SetOf(item)
+    local n = (item:GetName() or "")
+    if n:find("Summon") or n:find("Recall") then return ART.call end
+    return ART[tonumber(n:match("MultiCastSlotButton(%d)")) or 1] or ART[1]
+end
+
+local function Coords(tex, c)
+    tex:SetTexture(SHEET)
+    tex:SetTexCoord(c[1], c[2], c[3], c[4])
+end
+
+-- the up arrow above the selected slot (bar level only) and the border around it (also while the picker is open)
+local arrowF, borderF
+local function FlyoutArrow(btn, withArrow)
+    if not btn then
+        if arrowF then arrowF:Hide() end
+        if borderF then borderF:Hide() end
+        return
+    end
+    local recall = (btn:GetName() or ""):find("Recall")
+    if not arrowF then
+        arrowF = CreateFrame("Frame", nil, UIParent)
+        arrowF:SetFrameStrata("TOOLTIP")
+        arrowF:SetSize(28, 18)
+        arrowF.t = arrowF:CreateTexture(nil, "OVERLAY")
+        arrowF.t:SetAllPoints()
+        borderF = CreateFrame("Frame", nil, UIParent)
+        borderF:SetFrameStrata("TOOLTIP")
+        borderF:SetSize(34, 34)
+        borderF.t = borderF:CreateTexture(nil, "OVERLAY")
+        borderF.t:SetAllPoints()
+    end
+    local set = SetOf(btn)
+    Coords(arrowF.t, set.open)
+    Coords(borderF.t, set.border)
+    local ratio = btn:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    if ratio > 0 then arrowF:SetScale(ratio); borderF:SetScale(ratio) end
+    borderF:ClearAllPoints()
+    borderF:SetPoint("CENTER", btn, "CENTER")
+    borderF:Show()
+    arrowF:ClearAllPoints()
+    arrowF:SetPoint("BOTTOM", btn, "TOP", 0, 0)
+    -- the Recall button has the border but no flyout, so no arrow
+    arrowF:SetShown(withArrow ~= false and not recall)
+end
+
 local function Refresh()
     if level == "bar" then
         local item = barItems[barIdx]
         Highlight(item)
+        FlyoutArrow(item, true)
         if item then Tip(item, BarSpellId(item)) else HideTip() end
     else
+        FlyoutArrow(barItems[barIdx], false)
         local pick = picks and picks[pickIdx]
         Highlight(pick)
         if pick then Tip(pick, pick.spellId) else HideTip() end
@@ -152,36 +238,49 @@ local function Choices(item)
         local ab = ActionButtonOf(item)
         local slot = ab and ab:GetID()
         if slot then
+            -- like Blizzard's flyout: the slot can also be left empty, and that choice sits at the bottom
+            list[#list + 1] = { id = 0, empty = true }
             local ok, a, b, c, d, e, f, g, h = pcall(GetMultiCastTotemSpells, slot)
             if ok then for _, id in ipairs({ a, b, c, d, e, f, g, h }) do list[#list + 1] = { id = id } end end
-            -- like Blizzard's flyout: the slot can also be left empty
-            list[#list + 1] = { id = 0, empty = true }
         end
     end
     return list
 end
 
--- A column above the item, nearest choice at the bottom (like Blizzard's flyout)
+-- A column above the item, nearest choice at the bottom, drawn like Blizzard's flyout (same background
+-- pieces, down arrow at the top, 24px buttons 2px apart) and sitting right on the slot so it joins the bar.
+local BTN, GAP, PAD_TOP, PAD_BOTTOM, WIDTH = 24, 2, 20, 4, 32
+
 local function BuildPicker(item)
     local list = Choices(item)
     if #list == 0 then return false end
     if not picker then
-        picker = CreateFrame("Frame", "GamepadTotemBarPicker", UIParent, "BackdropTemplate")
+        picker = CreateFrame("Frame", "GamepadTotemBarPicker", UIParent)
         picker:SetFrameStrata("DIALOG")
-        picker:SetBackdrop({ bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-            edgeFile = "Interface/Tooltips/UI-Tooltip-Border", edgeSize = 12,
-            insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-        picker:SetBackdropColor(0, 0, 0, 0.85)
+        local top = picker:CreateTexture(nil, "BACKGROUND")
+        top:SetSize(WIDTH, 20)
+        top:SetPoint("TOP", picker, "TOP", 0, -10)
+        local mid = picker:CreateTexture(nil, "BACKGROUND")
+        mid:SetPoint("TOP", top, "BOTTOM", 0, 0)
+        mid:SetPoint("BOTTOM", picker, "BOTTOM", 0, 0)
+        mid:SetWidth(WIDTH)
+        local close = picker:CreateTexture(nil, "ARTWORK")
+        close:SetSize(28, 18)
+        close:SetPoint("TOP", picker, "TOP", 0, 0)
+        picker.top, picker.mid, picker.close = top, mid, close
         picker.buttons = {}
     end
+    local set = SetOf(item)
+    Coords(picker.top, set.top)
+    Coords(picker.mid, set.middle)
+    Coords(picker.close, set.close)
     for _, b in ipairs(picker.buttons) do b:Hide() end
     picks = {}
-    local size, gap = 32, 4
     for i, entry in ipairs(list) do
         local b = picker.buttons[i]
         if not b then
             b = CreateFrame("Button", nil, picker)
-            b:SetSize(size, size)
+            b:SetSize(BTN, BTN)
             b.icon = b:CreateTexture(nil, "ARTWORK")
             b.icon:SetAllPoints()
             b:SetScript("OnEnter", function(self) Tip(self, self.spellId) end)
@@ -189,18 +288,22 @@ local function BuildPicker(item)
             picker.buttons[i] = b
         end
         b.spellId, b.page, b.isCall, b.forItem = entry.id, entry.page, entry.call, item
-        local tex = entry.empty and "Interface/Buttons/UI-GroupLoot-Pass-Up" or ns.SpellIcon(entry.id)
-        b.icon:SetTexture(tex or "Interface/Icons/INV_Misc_QuestionMark")
+        if entry.empty then
+            Coords(b.icon, set.empty or ART[1].empty)
+        else
+            b.icon:SetTexture(ns.SpellIcon(entry.id) or "Interface/Icons/INV_Misc_QuestionMark")
+            b.icon:SetTexCoord(0, 1, 0, 1)
+        end
         b:ClearAllPoints()
-        b:SetPoint("BOTTOM", picker, "BOTTOM", 0, 6 + (i - 1) * (size + gap))
+        b:SetPoint("BOTTOM", picker, "BOTTOM", 0, PAD_BOTTOM + (i - 1) * (BTN + GAP))
         b:Show()
         picks[#picks + 1] = b
     end
-    picker:SetSize(size + 12, 12 + #list * size + (#list - 1) * gap)
+    picker:SetSize(WIDTH, PAD_TOP + PAD_BOTTOM + #list * BTN + (#list - 1) * GAP)
     local ratio = item:GetEffectiveScale() / UIParent:GetEffectiveScale()
     if ratio > 0 then picker:SetScale(ratio) end
     picker:ClearAllPoints()
-    picker:SetPoint("BOTTOM", item, "TOP", 0, 10)
+    picker:SetPoint("BOTTOM", item, "TOP", 0, 0)
     picker:Show()
     return true
 end
@@ -216,7 +319,14 @@ local function OpenPicker()
     -- the recall button has no choices
     if not b or (b:GetName() or ""):find("Recall") then return end
     ClosePicker()
-    if BuildPicker(b) then level = "pick"; pickIdx = 1; Refresh() end
+    if BuildPicker(b) then
+        level = "pick"
+        pickIdx = 1
+        local cur = BarSpellId(b)
+        for i, pk in ipairs(picks) do if cur and pk.spellId == cur then pickIdx = i break end end
+        if pickIdx == 1 and picks[2] and picks[1].spellId == 0 then pickIdx = 2 end
+        Refresh()
+    end
 end
 
 ---------------------------------------------------------------- entering / leaving / input
@@ -227,6 +337,7 @@ local function Exit(key)
     active = false
     ClosePicker()
     Highlight(nil)
+    FlyoutArrow(nil)
     if cap then cap:Hide() end
 end
 
@@ -294,7 +405,7 @@ local function Enter()
     barIdx = #barItems >= 2 and 2 or 1
     EnsureCap()
     cap:Show()
-    if not Safe("Enter", Refresh) then active = false; cap:Hide(); Highlight(nil) end
+    if not Safe("Enter", Refresh) then active = false; cap:Hide(); Highlight(nil); FlyoutArrow(nil) end
 end
 
 -- In combat the game blocks changing totems (and this frame's input settings) for addons: leave focus.
@@ -373,15 +484,57 @@ loadFrame:SetScript("OnEvent", function(self, _, name)
     end)
 end)
 
+---------------------------------------------------------------- /gtb dump (reads Blizzard's totem frames so the look can be matched)
+local function out(s) ns.Log(s) end
+
+local function DumpFrame(f, label)
+    if not f then out(label .. ": missing") return end
+    local w, h = f:GetSize()
+    out(string.format("%s  shown=%s size=%.0fx%.0f strata=%s level=%d", label, tostring(f:IsShown()), w or 0, h or 0, tostring(f:GetFrameStrata()), f:GetFrameLevel()))
+    for i = 1, f:GetNumPoints() do
+        local pt, rel, rp, x, y = f:GetPoint(i)
+        out(string.format("    point %s -> %s %s %.0f,%.0f", tostring(pt), rel and rel.GetName and tostring(rel:GetName()) or "?", tostring(rp), x or 0, y or 0))
+    end
+    local function Tex(t, name)
+        if not (t and t.GetTexture) then return end
+        local l, tp, ll, bt, rr, tp2, rb, bb = t:GetTexCoord()
+        local tw, th = t:GetSize()
+        local pts = {}
+        for i = 1, t:GetNumPoints() do
+            local pt, rel, rp, x, y = t:GetPoint(i)
+            pts[#pts + 1] = string.format("%s>%s@%.0f,%.0f", tostring(pt), rel and rel.GetName and tostring(rel:GetName() or "?") or "?", x or 0, y or 0)
+            if rp then pts[#pts] = pts[#pts] .. "(" .. tostring(rp) .. ")" end
+        end
+        local vr, vg, vb = t:GetVertexColor()
+        out(string.format("    tex %s tint=%.2f,%.2f,%.2f blend=%s atlas=%s file=%s coords=%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f size=%.0fx%.0f layer=%s pts=%s",
+            name, vr or 1, vg or 1, vb or 1, tostring(t:GetBlendMode()), tostring(t.GetAtlas and t:GetAtlas()), tostring(t:GetTexture()), l or 0, tp or 0, ll or 0, bt or 0, rr or 0, tp2 or 0, rb or 0, bb or 0, tw or 0, th or 0,
+            tostring(t:GetDrawLayer()), table.concat(pts, " ")))
+    end
+    for _, r in ipairs({ f:GetRegions() }) do Tex(r, tostring(r.GetName and r:GetName() or r:GetObjectType())) end
+    for _, k in ipairs({ "GetNormalTexture", "GetPushedTexture", "GetHighlightTexture", "GetCheckedTexture" }) do
+        if f[k] then Tex(f[k](f), k) end
+    end
+end
+
+local function Dump()
+    ns.ClearReport()
+    for _, n in ipairs({ "MultiCastSlotButton1", "MultiCastSlotButton2", "MultiCastSlotButton3", "MultiCastSlotButton4",
+        "MultiCastSummonSpellButton", "MultiCastRecallSpellButton" }) do
+        DumpFrame(_G[n], n)
+    end
+    ns.ShowReport()
+end
+
 ---------------------------------------------------------------- slash command
 SLASH_GAMEPADTOTEMBAR1 = "/gtb"
 SlashCmdList.GAMEPADTOTEMBAR = function(msg)
     local cmd = (msg or ""):match("^(%S*)"):lower()
     if cmd == "focus" then
         ToggleFocus()
+    elseif cmd == "dump" then Safe("Dump", Dump)
     elseif cmd == "report" then ns.ShowReport()
     elseif cmd == "clearreport" then ns.ClearReport(); print(PREFIX .. "report log cleared.")
     else
-        print(PREFIX .. "/gtb focus | report | clearreport")
+        print(PREFIX .. "/gtb focus | report | clearreport | dump")
     end
 end
