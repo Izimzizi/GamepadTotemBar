@@ -93,7 +93,10 @@ local function Restore()
             if not InCombatLockdown() then self:Show() end
         end)
         hooksecurefunc(fr, "SetAlpha", function(self, a)
-            if a == 0 then self:SetAlpha(1) end
+            -- other addons (e.g. fade-out-of-combat) may pass a secret value; can't compare those
+            if type(a) == "number" and not (issecretvalue and issecretvalue(a)) and a == 0 then
+                self:SetAlpha(1)
+            end
         end)
         -- keep our scale if the game or an Edit Mode layout resets it
         hooksecurefunc(fr, "SetScale", function() if not settingScale then ApplyScale() end end)

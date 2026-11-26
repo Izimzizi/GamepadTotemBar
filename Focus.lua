@@ -85,7 +85,11 @@ end
 -- The spell currently on a bar item, for its tooltip
 local function BarSpellId(item)
     local name = item:GetName() or ""
-    if name:find("Summon") then return tonumber(item.spellId) or CALL_SPELLS[1] end
+    if name:find("Summon") then
+        -- the active Call spell is the bar's action page, which ApplyPick and the game both keep current
+        local page = item.GetID and item:GetID()
+        return CALL_SPELLS[page or 0] or tonumber(item.spellId) or CALL_SPELLS[1]
+    end
     if name:find("Recall") then return RECALL_SPELL end
     local action = SlotAction(item)
     if action then
@@ -333,7 +337,7 @@ local function OpenPicker()
         pickIdx = 1
         local cur = BarSpellId(b)
         for i, pk in ipairs(picks) do if cur and pk.spellId == cur then pickIdx = i break end end
-        if pickIdx == 1 and picks[2] and picks[1].spellId == 0 then pickIdx = 2 end
+        -- an empty slot has no spell: the "empty" choice (first in the list) stays selected
         Refresh()
     end
 end
