@@ -1,0 +1,6 @@
+package-as: GamepadTotemBar
+
+ignore:
+  - docs
+  - README.md
+  - logo.png

@@ -4,6 +4,7 @@
 ## Author: Izimzizi
 ## IconTexture: Interface\AddOns\GamepadTotemBar\logo
 ## Version: 1.0.3
+## X-Curse-Project-ID: 1831594
 ## SavedVariables: GamepadTotemBarDB
 
 Report.lua
